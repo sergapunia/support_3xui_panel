@@ -58,18 +58,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(status: GameState.connecting, errorMessage: null);
     _panel.updateBaseUrl(url);
 
-    final success = await _panel.authenticate(admin, password, host, ipCascad, portCascad);
+    final (success, error) = await _panel.authenticate(admin, password, host, ipCascad, portCascad);
 
     if (success) {
       print('AuthNotifier: auth success');
       await _prefs.saveConnection(url, admin, password, host, ipCascad, portCascad);
-      state = state.copyWith(status: GameState.connected, baseUrl: url);
+      state = state.copyWith(status: GameState.connected, baseUrl: url, errorMessage: null);
       return true;
     } else {
-      print('AuthNotifier: auth failed');
-      // If error happens, clear invalid stored credentials
-      await _prefs.clearConnection();
-      state = state.copyWith(status: GameState.idle, errorMessage: 'Authentication failed');
+      print('AuthNotifier: auth failed: $error');
+      // Do not clear connection here to allow user to see/fix their input
+      state = state.copyWith(status: GameState.idle, errorMessage: error ?? 'Authentication failed');
       return false;
     }
   }

@@ -170,6 +170,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 : const Text('AUTHORIZE', style: TextStyle(letterSpacing: 2)),
                           ),
                         ),
+                        if (ref.watch(authProvider).errorMessage != null) ...[
+                          const SizedBox(height: 16),
+                          Text(
+                            ref.watch(authProvider).errorMessage!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+                          ),
+                        ],
                         const SizedBox(height: 20),
                       ],
                     ),

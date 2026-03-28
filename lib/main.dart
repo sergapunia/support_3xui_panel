@@ -83,8 +83,8 @@ class MyApp extends ConsumerWidget {
       case GameState.connected:
         return const DashboardScreen();
       case GameState.initial:
-      case GameState.connecting:
         return const Scaffold(backgroundColor: Colors.black);
+      case GameState.connecting:
       case GameState.idle:
       case GameState.error:
         return const LoginScreen();

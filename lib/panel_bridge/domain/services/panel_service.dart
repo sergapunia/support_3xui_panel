@@ -15,7 +15,7 @@ class PanelService {
     _dio.options.baseUrl = _baseUrl!;
   }
 
-  Future<bool> authenticate(String admin, String password, String host, String ipCascad, int portCascad) async {
+  Future<(bool, String?)> authenticate(String admin, String password, String host, String ipCascad, int portCascad) async {
     final payload = {
       'admin': admin,
       'password': password,
@@ -27,10 +27,18 @@ class PanelService {
     try {
       final response = await _dio.post('/auth', data: payload);
       print('PanelService: AUTH Response ${response.statusCode} | Data: ${response.data}');
-      return response.statusCode == 200;
+      if (response.statusCode == 200) {
+        return (true, null);
+      }
+      return (false, response.data?['detail']?.toString() ?? 'Unknown response status: ${response.statusCode}');
+    } on DioException catch (e) {
+      print('PanelService: auth dio error: ${e.type} | Response: ${e.response?.data}');
+      final detail = e.response?.data?['detail']?.toString();
+      final msg = detail ?? e.message ?? 'Network error';
+      return (false, msg);
     } catch (e) {
-      print('PanelService: auth error: $e');
-      return false;
+      print('PanelService: auth generic error: $e');
+      return (false, e.toString());
     }
   }
 
