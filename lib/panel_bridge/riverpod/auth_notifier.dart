@@ -40,7 +40,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
     if (conn['baseUrl'] != null && conn['admin'] != null && conn['password'] != null) {
       print('AuthNotifier: Found stored credentials, attempting auto-login...');
       await connect(
-        conn['baseUrl']!,
         conn['admin']!,
         conn['password']!,
         conn['host'] ?? '',
@@ -53,7 +52,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<bool> connect(String url, String admin, String password, String host, String ipCascad, int portCascad) async {
+  Future<bool> connect(String admin, String password, String host, String ipCascad, int portCascad) async {
+    // Auto-detect URL from current origin (Web)
+    final url = Uri.base.origin;
     print('AuthNotifier: connecting to $url');
     state = state.copyWith(status: GameState.connecting, errorMessage: null);
     _panel.updateBaseUrl(url);
@@ -67,7 +68,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
       return true;
     } else {
       print('AuthNotifier: auth failed: $error');
-      // Do not clear connection here to allow user to see/fix their input
       state = state.copyWith(status: GameState.idle, errorMessage: error ?? 'Authentication failed');
       return false;
     }

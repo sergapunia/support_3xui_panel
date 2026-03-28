@@ -13,7 +13,6 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _urlController = TextEditingController();
   final _adminController = TextEditingController();
   final _passController = TextEditingController();
   final _hostController = TextEditingController();
@@ -23,18 +22,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    // Pre-fill some defaults or existing data
-    Future.microtask(() {
-      final state = ref.read(authProvider);
-      if (state.baseUrl != null) {
-        _urlController.text = state.baseUrl!;
-      }
-    });
   }
 
   @override
   void dispose() {
-    _urlController.dispose();
     _adminController.dispose();
     _passController.dispose();
     _hostController.dispose();
@@ -48,7 +39,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       final success = await ref
           .read(authProvider.notifier)
           .connect(
-            _urlController.text,
             _adminController.text,
             _passController.text,
             _hostController.text,
@@ -100,12 +90,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           child: Text('Enter Panel Credentials', style: TextStyle(color: Colors.white60, fontSize: 13)),
                         ),
                         const SizedBox(height: 40),
-                        TextFormField(
-                          controller: _urlController,
-                          decoration: const InputDecoration(labelText: 'Bridge API URL', hintText: 'http://ip:8000'),
-                          validator: (v) => v!.isEmpty ? 'Required' : null,
-                        ),
-                        const SizedBox(height: 20),
                         TextFormField(
                           controller: _adminController,
                           decoration: const InputDecoration(labelText: '3x-ui User'),

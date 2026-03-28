@@ -2,18 +2,28 @@
 set -e
 
 DOMAIN=$1
-if [ -z "$DOMAIN" ]; then echo "❌ Укажите домен!"; exit 1; fi
+PORT=$2
+
+if [ -z "$DOMAIN" ] || [ -z "$PORT" ]; then 
+    echo "❌ Использование: sudo bash install_all.sh ДОМЕН ПОРТ"
+    echo "Пример: sudo bash install_all.sh sergamainpanel.mooo.com 8443"
+    exit 1
+fi
 
 RAW_URL="https://raw.githubusercontent.com/sergapunia/support_3xui_panel/main"
 
-echo "🌟 ПОЛНАЯ ЧИСТАЯ УСТАНОВКА"
+echo "🌟 ПОЛНАЯ ЧИСТАЯ УСТАНОВКА (Домен: $DOMAIN, Порт: $PORT)"
 
-# Бэкенд
+# 1. Бэкенд (передаем домен и порт для настройки ссылок подписок)
 curl -sL "$RAW_URL/setup_backend.sh" -o /tmp/setup_backend.sh
-sudo bash /tmp/setup_backend.sh
+sudo bash /tmp/setup_backend.sh "$DOMAIN" "$PORT"
 
-# Фронтенд
+# 2. Фронтенд (настраиваем Nginx на тот же порт)
 curl -sL "$RAW_URL/setup_frontend.sh" -o /tmp/setup_frontend.sh
-sudo bash /tmp/setup_frontend.sh "$DOMAIN"
+sudo bash /tmp/setup_frontend.sh "$DOMAIN" "$PORT"
 
-echo "🎉 Готово! На сервере теперь только папка бэкенда и билд фронтенда."
+echo "----------------------------------------------------"
+echo "🎉 ВСЁ УСТАНОВЛЕНО!"
+echo "🌐 Сайт: https://$DOMAIN:$PORT"
+echo "🔐 API проксируется через этот же порт автоматически."
+echo "----------------------------------------------------"
