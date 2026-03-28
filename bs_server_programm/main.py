@@ -208,24 +208,26 @@ def get_subscription(client_id: str):
     sub_conf = conf.get("subscription", {})
 
     # 1. Формируем тело подписки
-    # Happe и другие лучше понимают, когда описание идет в первой строке как комментарий или через спец-заголовки
-    title_raw = sub_conf.get("title", "VPN Subscription")
+    title_raw = sub_conf.get("title", "VPN Premium")
     description = sub_conf.get("description", "")
     
+    # Чтобы описание точно появилось, добавим его как "пустую" конфигурацию (инфо-ноду)
+    # Это старый трюк: добавляем прокси-ссылку, которая на самом деле просто текст
+    info_link = f"vless://info@127.0.0.1:0?type=tcp&security=none#{urllib.parse.quote(description)}"
+    
     output_lines = []
-    # Добавляем инфо-строку (протокол подписки)
     if description:
-        output_lines.append(f"#{description}")
+        output_lines.append(info_link)
     
     output_lines.extend(links)
     
     content_str = "\n".join(output_lines)
     content_b64 = base64.b64encode(content_str.encode("utf-8")).decode("utf-8")
 
-    # 2. Настраиваем заголовки (ВАЖНО для Happe)
+    # 2. Настраиваем заголовки
     update_interval = str(sub_conf.get("update_interval_sec", 3600))
     
-    # Userinfo в байтах
+    # Формируем Userinfo (трафик)
     sub_userinfo = (
         f"upload={meta['upload']}; "
         f"download={meta['download']}; "
@@ -234,13 +236,17 @@ def get_subscription(client_id: str):
     )
 
     headers = {
-        # Profile-Title в Base64 иногда глючит в Happ, если там есть эмодзи. 
-        # Пробуем передать его и в кодировке, и через Content-Disposition
-        "Profile-Title": base64.b64encode(title_raw.encode('utf-8')).decode('utf-8'),
+        # Попробуем передать заголовок БЕЗ base64 (чистым текстом)
+        # Если Happe увидит Profile-Title, он должен его взять.
+        "Profile-Title": title_raw, 
         "Subscription-Userinfo": sub_userinfo,
         "Profile-Update-Interval": update_interval,
     }
     
+    # Если заголовок выше не сработает (Happe всё еще будет капризничать), 
+    # этот заголовок часто помогает как запасной:
+    headers["Content-Disposition"] = f'attachment; filename*=UTF-8\'\'{urllib.parse.quote(title_raw)}'
+
     if sub_conf.get("support_url"):
         headers["Profile-Web-Page"] = sub_conf.get("support_url")
 
