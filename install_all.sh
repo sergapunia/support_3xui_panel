@@ -2,32 +2,18 @@
 set -e
 
 DOMAIN=$1
+if [ -z "$DOMAIN" ]; then echo "❌ Укажите домен!"; exit 1; fi
 
-if [ -z "$DOMAIN" ]; then
-    echo "❌ Использование: sudo bash install_all.sh твой_домен.com"
-    exit 1
-fi
+RAW_URL="https://raw.githubusercontent.com/sergapunia/support_3xui_panel/main"
 
-REPO_URL="https://github.com/sergapunia/support_3xui_panel.git"
-TARGET_DIR="/root/support_3xui_panel"
+echo "🌟 ПОЛНАЯ ЧИСТАЯ УСТАНОВКА"
 
-echo "🌟 ПОЛНАЯ УСТАНОВКА (Backend + Frontend)"
+# Бэкенд
+curl -sL "$RAW_URL/setup_backend.sh" -o /tmp/setup_backend.sh
+sudo bash /tmp/setup_backend.sh
 
-# 1. Клонирование (если запускается не из папки проекта)
-if [ ! -f "setup_backend.sh" ]; then
-    git clone "$REPO_URL" "$TARGET_DIR"
-    cd "$TARGET_DIR"
-fi
+# Фронтенд
+curl -sL "$RAW_URL/setup_frontend.sh" -o /tmp/setup_frontend.sh
+sudo bash /tmp/setup_frontend.sh "$DOMAIN"
 
-# 2. Права на запуск
-chmod +x setup_backend.sh setup_frontend.sh
-
-# 3. Последовательная установка
-./setup_backend.sh
-./setup_frontend.sh "$DOMAIN"
-
-echo "--------------------------------------------------"
-echo "🎉 УСТАНОВКА ЗАВЕРШЕНА!"
-echo "🔗 Подписки (Happ): https://$DOMAIN/sub/UUID"
-echo "🔗 Админка: https://$DOMAIN"
-echo "--------------------------------------------------"
+echo "🎉 Готово! На сервере теперь только папка бэкенда и билд фронтенда."
