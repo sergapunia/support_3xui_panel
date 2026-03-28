@@ -1,23 +1,37 @@
 #!/bin/bash
 set -e
 
-# Определяем пути относительно текущей директории
-PROJECT_DIR=$(pwd)
-BACKEND_DIR="$PROJECT_DIR/bs_server_programm"
+# Конфигурация
+REPO_URL="https://github.com/sergapunia/support_3xui_panel.git"
+TARGET_DIR="/root/support_backend"
+BACKEND_DIR="$TARGET_DIR/bs_server_programm"
 VENV_PATH="$BACKEND_DIR/venv"
+
+echo "📥 Клонирование репозитория в $TARGET_DIR..."
+
+# 1. Очистка и клонирование
+sudo rm -rf "$TARGET_DIR"
+git clone "$REPO_URL" "$TARGET_DIR"
+
+# Проверка, что папка существует
+if [ ! -d "$BACKEND_DIR" ]; then
+    echo "❌ Ошибка: Папка $BACKEND_DIR не найдена в репозитории!"
+    exit 1
+fi
 
 echo "🐍 Настройка Бэкенда (API) в $BACKEND_DIR..."
 
-# Установка зависимостей
+# 2. Установка системных зависимостей
 sudo apt-get update && sudo apt-get install -y python3 python3-pip python3-venv
 
-# Создание venv и установка библиотек
+# 3. Создание venv и установка библиотек
 python3 -m venv "$VENV_PATH"
 source "$VENV_PATH/bin/activate"
 pip install --upgrade pip
-pip install fastapi uvicorn requests pydantic cryptography
+# Добавляем python-multipart для корректной работы форм авторизации
+pip install fastapi uvicorn requests pydantic cryptography python-multipart
 
-# Создание системной службы
+# 4. Создание системной службы
 echo "⚙️ Создание службы bs_backend.service..."
 sudo cat > /etc/systemd/system/bs_backend.service <<EOF
 [Unit]
@@ -34,8 +48,9 @@ Restart=always
 WantedBy=multi-user.target
 EOF
 
+# 5. Запуск
 sudo systemctl daemon-reload
 sudo systemctl enable bs_backend
 sudo systemctl restart bs_backend
 
-echo "✅ Бэкенд успешно запущен на 127.0.0.1:8000"
+echo "✅ Бэкенд успешно запущен и работает как служба."
