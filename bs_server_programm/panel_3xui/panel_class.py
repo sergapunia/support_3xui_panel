@@ -97,26 +97,37 @@ class XUIClient:
         return self._safe_post(url, data={"id": int(inbound_id), "settings": json.dumps(client_data)})
 
     def del_client(self, inbound_id, email):
-        # 1. Сначала находим клиента по email, чтобы получить его UUID (id)
+        # 1. Получаем список клиентов, чтобы найти UUID (id) по email
         clients = self.get_clients_inbound(inbound_id)
         client = next((c for c in clients if c['email'].lower() == email.lower()), None)
         
         if not client:
-            return {"success": False, "msg": f"Client with email {email} not found"}
-
-        # 2. Формируем запрос на удаление. 
-        # В 3x-ui эндпоинт: /panel/api/inbounds/delClient/{client_uuid}
+            return {"success": False, "msg": f"Client {email} not found"}
+        
+        # 2. Определяем UUID клиента
         client_uuid = client['id']
+        
+        # Эндпоинт для удаления
         url = f"{self.base_url}/panel/api/inbounds/delClient/{client_uuid}"
         
-        # ВАЖНО: Большинство версий 3x-ui требуют ID инбаунда в теле запроса
-        # Мы отправляем его как обычную форму (data)
+        # 3. Подготавливаем данные. 
+        # Большинство версий панели требуют передачу id инбаунда.
         payload = {"id": int(inbound_id)}
         
-        print(f"🔄 Attempting to delete client {email} (UUID: {client_uuid}) from inbound {inbound_id}")
+        # Пробуем отправить как form-data (через data=)
+        # Если ваша панель требует JSON, можно заменить на json=payload
+        response = self.session.post(url, data=payload)
         
-        # Используем наш метод _safe_post
-        return self._safe_post(url, data=payload)
+        try:
+            res_json = response.json()
+            if not res_json.get("success"):
+                # Если не сработало, пробуем отправить UUID еще и в теле (бывает в старых версиях)
+                alt_payload = {"id": int(inbound_id), "clientUuid": client_uuid}
+                response = self.session.post(url, data=alt_payload)
+                res_json = response.json()
+            return res_json
+        except Exception as e:
+            return {"success": response.status_code == 200, "msg": response.text}
 
     def get_subscription_data(self, client_id: str):
         inbounds_res = self.get_inbounds()
