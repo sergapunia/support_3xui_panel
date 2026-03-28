@@ -16,3 +16,8 @@ Cleanup
 ```bash
 curl -sL https://raw.githubusercontent.com/sergapunia/support_3xui_panel/main/cleanup.sh | sudo bash
 ```
+
+Back logs
+```
+journalctl -u bs_backend -f
+```
