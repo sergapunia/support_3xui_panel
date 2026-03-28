@@ -97,37 +97,43 @@ class XUIClient:
         return self._safe_post(url, data={"id": int(inbound_id), "settings": json.dumps(client_data)})
 
     def del_client(self, inbound_id, email):
-        # 1. Получаем список клиентов, чтобы найти UUID (id) по email
-        clients = self.get_clients_inbound(inbound_id)
-        client = next((c for c in clients if c['email'].lower() == email.lower()), None)
+        # 1. Получаем текущие данные инбаунда
+        res = self.get_inbound_by_id(inbound_id)
+        if not res.get("success") or not res.get("obj"):
+            return {"success": False, "msg": "Inbound not found"}
+
+        obj = res['obj']
+        # Распаковываем текущие настройки
+        settings = json.loads(obj['settings'])
+        clients = settings.get('clients', [])
+
+        # 2. Фильтруем список: оставляем всех, кроме того, чей email совпал
+        # Используем .strip() и .lower() для точности
+        new_clients = [c for c in clients if c.get('email', '').lower().strip() != email.lower().strip()]
+
+        if len(new_clients) == len(clients):
+            return {"success": False, "msg": f"Client with email '{email}' not found in this inbound"}
+
+        # 3. Подготавливаем payload для обновления инбаунда
+        # Важно сохранить старые streamSettings и sniffing, чтобы ничего не сломать
+        url = f"{self.base_url}/panel/api/inbounds/update/{inbound_id}"
         
-        if not client:
-            return {"success": False, "msg": f"Client {email} not found"}
+        settings['clients'] = new_clients
         
-        # 2. Определяем UUID клиента
-        client_uuid = client['id']
+        payload = {
+            "remark": obj['remark'],
+            "enable": obj['enable'],
+            "port": obj['port'],
+            "protocol": obj['protocol'],
+            "settings": json.dumps(settings),
+            "streamSettings": obj['streamSettings'],
+            "sniffing": obj['sniffing']
+        }
+
+        print(f"🔄 Deleting client by email: {email}. Updating inbound {inbound_id}...")
         
-        # Эндпоинт для удаления
-        url = f"{self.base_url}/panel/api/inbounds/delClient/{client_uuid}"
-        
-        # 3. Подготавливаем данные. 
-        # Большинство версий панели требуют передачу id инбаунда.
-        payload = {"id": int(inbound_id)}
-        
-        # Пробуем отправить как form-data (через data=)
-        # Если ваша панель требует JSON, можно заменить на json=payload
-        response = self.session.post(url, data=payload)
-        
-        try:
-            res_json = response.json()
-            if not res_json.get("success"):
-                # Если не сработало, пробуем отправить UUID еще и в теле (бывает в старых версиях)
-                alt_payload = {"id": int(inbound_id), "clientUuid": client_uuid}
-                response = self.session.post(url, data=alt_payload)
-                res_json = response.json()
-            return res_json
-        except Exception as e:
-            return {"success": response.status_code == 200, "msg": response.text}
+        # Отправляем обновленный инбаунд без удаленного клиента
+        return self._safe_post(url, data=payload)
 
     def get_subscription_data(self, client_id: str):
         inbounds_res = self.get_inbounds()
