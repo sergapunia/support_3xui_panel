@@ -9,6 +9,7 @@ import requests as _requests
 from urllib.parse import urlparse
 from panel_3xui.panel_class import XUIClient
 from fastapi.middleware.cors import CORSMiddleware
+import urllib.parse
 
 app = FastAPI(title="3x-ui Transit API")
 
