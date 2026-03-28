@@ -193,9 +193,12 @@ def get_subscription_link(client_id: str):
         # Если в конфиге пусто, пробуем собрать на лету
         return {"subscription_url": f"https://{urlparse(conf['host_current_server']).hostname}:{EXTERNAL_PORT}/sub/{client_id}"}
     return {"subscription_url": f"{base}/sub/{client_id}"}
-
 @app.get("/sub/{client_id}")
 def get_subscription(client_id: str):
+    """
+    Эндпоинт подписки для VPN-клиентов (Happ, Hiddify, Shadowrocket и т.д.).
+    Исправлено: безопасная кодировка заголовков и инфо-ссылка для описания.
+    """
     xui = get_xui()
     data = xui.get_subscription_data(client_id)
     if data is None:
@@ -204,31 +207,43 @@ def get_subscription(client_id: str):
     links = data["links"]
     meta = data["meta"]
 
-    with open(CONFIG_PATH, 'r') as f:
-        conf = json.load(f)
+    try:
+        with open(CONFIG_PATH, 'r') as f:
+            conf = json.load(f)
+    except Exception:
+        conf = {}
+        
     sub_conf = conf.get("subscription", {})
 
     # 1. Формируем тело подписки
     title_raw = sub_conf.get("title", "VPN Premium")
     description = sub_conf.get("description", "")
     
-    # Чтобы описание точно появилось, добавим его как "пустую" конфигурацию (инфо-ноду)
-    # Это старый трюк: добавляем прокси-ссылку, которая на самом деле просто текст
-    info_link = f"vless://info@127.0.0.1:0?type=tcp&security=none#{urllib.parse.quote(description)}"
-    
     output_lines = []
+    
+    # Трюк для Happ: Добавляем описание как "пустую" VLESS ссылку.
+    # Она появится в списке как текстовая строка с иконкой инфо.
     if description:
+        # Кодируем только текст после #, чтобы не сломать формат ссылки
+        safe_desc = urllib.parse.quote(f"ℹ️ {description}")
+        info_link = f"vless://info@127.0.0.1:0?type=tcp&security=none#{safe_desc}"
         output_lines.append(info_link)
     
+    # Добавляем основные рабочие ссылки
     output_lines.extend(links)
     
+    # Кодируем весь список в Base64 (стандарт для подписок)
     content_str = "\n".join(output_lines)
     content_b64 = base64.b64encode(content_str.encode("utf-8")).decode("utf-8")
 
-    # 2. Настраиваем заголовки
+    # 2. Подготовка безопасных заголовков (избегаем UnicodeEncodeError)
     update_interval = str(sub_conf.get("update_interval_sec", 3600))
     
-    # Формируем Userinfo (трафик)
+    # Кодируем заголовок профиля в Base64. 
+    # Большинство клиентов декодируют это обратно в текст с эмодзи.
+    encoded_title = base64.b64encode(title_raw.encode('utf-8')).decode('utf-8')
+    
+    # Данные о трафике (Userinfo)
     sub_userinfo = (
         f"upload={meta['upload']}; "
         f"download={meta['download']}; "
@@ -236,17 +251,17 @@ def get_subscription(client_id: str):
         f"expire={meta['expire']}"
     )
 
+    # Собираем заголовки
     headers = {
-        # Попробуем передать заголовок БЕЗ base64 (чистым текстом)
-        # Если Happe увидит Profile-Title, он должен его взять.
-        "Profile-Title": title_raw, 
+        # Префикс 'base64:' подсказывает приложению, как расшифровать заголовок
+        "Profile-Title": f"base64:{encoded_title}", 
         "Subscription-Userinfo": sub_userinfo,
         "Profile-Update-Interval": update_interval,
     }
     
-    # Если заголовок выше не сработает (Happe всё еще будет капризничать), 
-    # этот заголовок часто помогает как запасной:
-    headers["Content-Disposition"] = f'attachment; filename*=UTF-8\'\'{urllib.parse.quote(title_raw)}'
+    # Запасной вариант для отображения имени (через стандарт передачи имен файлов)
+    safe_filename = urllib.parse.quote(title_raw)
+    headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{safe_filename}"
 
     if sub_conf.get("support_url"):
         headers["Profile-Web-Page"] = sub_conf.get("support_url")
