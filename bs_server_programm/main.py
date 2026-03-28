@@ -232,8 +232,7 @@ def get_subscription_link(client_id: str):
 @app.get("/sub/{client_id}")
 def get_subscription(client_id: str):
     """
-    Финальная версия: исправлены заголовки (latin-1), 
-    добавлена поддержка эмодзи и инфо-строка для описания.
+    Исправленная версия: корректное отображение описания и ссылки поддержки в Happ.
     """
     xui = get_xui()
     data = xui.get_subscription_data(client_id)
@@ -248,7 +247,7 @@ def get_subscription(client_id: str):
             conf = json.load(f)
     except Exception:
         conf = {}
-        
+
     sub_conf = conf.get("subscription", {})
     title_raw = sub_conf.get("title", "VPN Premium")
     description = sub_conf.get("description", "")
@@ -256,26 +255,19 @@ def get_subscription(client_id: str):
 
     # 1. Формируем тело подписки (Base64 контент)
     output_lines = []
-    
-    if description:
-        # Добавляем текстовое описание как "фейковый" сервер, 
-        # чтобы оно отобразилось в списке Happ
-        safe_desc = urllib.parse.quote(f"ℹ️ {description}")
-        info_link = f"vless://info@127.0.0.1:0?type=tcp&security=none#{safe_desc}"
-        output_lines.append(info_link)
-    
+
     # Добавляем рабочие VLESS ссылки
     output_lines.extend(links)
-    
+
     content_str = "\n".join(output_lines)
     content_b64 = base64.b64encode(content_str.encode("utf-8")).decode("utf-8")
 
     # 2. Формируем заголовки (Headers)
     update_interval = str(sub_conf.get("update_interval_sec", 3600))
-    
+
     # Кодируем заголовок профиля в Base64 для защиты от UnicodeEncodeError
     encoded_title = base64.b64encode(title_raw.encode('utf-8')).decode('utf-8')
-    
+
     # Данные о трафике (Subscription-Userinfo)
     sub_userinfo = (
         f"upload={meta['upload']}; "
@@ -286,13 +278,15 @@ def get_subscription(client_id: str):
 
     headers = {
         # 'base64:' - стандартный префикс для передачи эмодзи/кириллицы
-        "Profile-Title": f"base64:{encoded_title}", 
+        "Profile-Title": f"base64:{encoded_title}",
         "Subscription-Userinfo": sub_userinfo,
         "Profile-Update-Interval": update_interval,
         # Ссылка на поддержку (отобразится в меню информации о подписке)
-        "Profile-Web-Page": support_url
+        "Profile-Web-Page": support_url,
+        # Добавляем описание как отдельный заголовок
+        "Profile-Description": description
     }
-    
+
     # Добавляем стандартный заголовок Link для некоторых клиентов
     headers["Link"] = f'<{support_url}>; rel="help"'
 
@@ -301,10 +295,11 @@ def get_subscription(client_id: str):
     headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{safe_filename}"
 
     return Response(
-        content=content_b64, 
-        headers=headers, 
+        content=content_b64,
+        headers=headers,
         media_type="text/plain; charset=utf-8"
     )
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
