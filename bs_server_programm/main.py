@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Body
 from fastapi.responses import Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import base64
 from typing import Optional, List
 import json
@@ -100,6 +100,18 @@ class SubscriptionConfig(BaseModel):
     support_url: Optional[str] = None
     update_interval_sec: Optional[int] = None
 
+class FullConfig(BaseModel):
+    ip_cascad_server: Optional[str] = None
+    port_cascad_server: Optional[int] = None
+    xui_admin: Optional[str] = Field(None, alias="3xui_admin")
+    xui_password: Optional[str] = Field(None, alias="3xui_password")
+    host_current_server: Optional[str] = None
+    default_target: Optional[str] = None
+    default_sni: Optional[str] = None
+    start_range_ports: Optional[int] = None
+    end_range_ports: Optional[int] = None
+    subscription: Optional[SubscriptionConfig] = None
+
 # --- Endpoints ---
 
 @app.get("/inbounds")
@@ -153,6 +165,30 @@ def get_config():
     with open(CONFIG_PATH, 'r') as f:
         return json.load(f)
 
+@app.post("/config")
+def save_config(data: FullConfig):
+    # Pydantic V2 use model_dump, V1 use dict
+    try:
+        conf_dict = data.model_dump(by_alias=True, exclude_none=True)
+    except AttributeError:
+        conf_dict = data.dict(by_alias=True, exclude_none=True)
+    
+    # Load existing to preserve any extra fields not in FullConfig
+    try:
+        if os.path.exists(CONFIG_PATH):
+            with open(CONFIG_PATH, 'r') as f:
+                existing = json.load(f)
+            existing.update(conf_dict)
+            conf_dict = existing
+    except Exception:
+        pass
+
+    with open(CONFIG_PATH, 'w') as f:
+        json.dump(conf_dict, f, indent=2)
+    
+    _auto_detect_bridge_url()
+    return {"success": True, "msg": "Config updated"}
+
 @app.patch("/config/subscription")
 def update_subscription_config(data: SubscriptionConfig):
     with open(CONFIG_PATH, 'r') as f:
@@ -196,13 +232,13 @@ def get_subscription_link(client_id: str):
 @app.get("/sub/{client_id}")
 def get_subscription(client_id: str):
     """
-    Эндпоинт подписки для VPN-клиентов (Happ, Hiddify, Shadowrocket и т.д.).
-    Исправлено: безопасная кодировка заголовков и инфо-ссылка для описания.
+    Финальная версия: исправлены заголовки (latin-1), 
+    добавлена поддержка эмодзи и инфо-строка для описания.
     """
     xui = get_xui()
     data = xui.get_subscription_data(client_id)
     if data is None:
-        raise HTTPException(status_code=404, detail=f"Client not found")
+        raise HTTPException(status_code=404, detail="Client not found")
 
     links = data["links"]
     meta = data["meta"]
@@ -214,36 +250,33 @@ def get_subscription(client_id: str):
         conf = {}
         
     sub_conf = conf.get("subscription", {})
-
-    # 1. Формируем тело подписки
     title_raw = sub_conf.get("title", "VPN Premium")
     description = sub_conf.get("description", "")
-    
+    support_url = sub_conf.get("support_url", "https://t.me/sergapunia")
+
+    # 1. Формируем тело подписки (Base64 контент)
     output_lines = []
     
-    # Трюк для Happ: Добавляем описание как "пустую" VLESS ссылку.
-    # Она появится в списке как текстовая строка с иконкой инфо.
     if description:
-        # Кодируем только текст после #, чтобы не сломать формат ссылки
+        # Добавляем текстовое описание как "фейковый" сервер, 
+        # чтобы оно отобразилось в списке Happ
         safe_desc = urllib.parse.quote(f"ℹ️ {description}")
         info_link = f"vless://info@127.0.0.1:0?type=tcp&security=none#{safe_desc}"
         output_lines.append(info_link)
     
-    # Добавляем основные рабочие ссылки
+    # Добавляем рабочие VLESS ссылки
     output_lines.extend(links)
     
-    # Кодируем весь список в Base64 (стандарт для подписок)
     content_str = "\n".join(output_lines)
     content_b64 = base64.b64encode(content_str.encode("utf-8")).decode("utf-8")
 
-    # 2. Подготовка безопасных заголовков (избегаем UnicodeEncodeError)
+    # 2. Формируем заголовки (Headers)
     update_interval = str(sub_conf.get("update_interval_sec", 3600))
     
-    # Кодируем заголовок профиля в Base64. 
-    # Большинство клиентов декодируют это обратно в текст с эмодзи.
+    # Кодируем заголовок профиля в Base64 для защиты от UnicodeEncodeError
     encoded_title = base64.b64encode(title_raw.encode('utf-8')).decode('utf-8')
     
-    # Данные о трафике (Userinfo)
+    # Данные о трафике (Subscription-Userinfo)
     sub_userinfo = (
         f"upload={meta['upload']}; "
         f"download={meta['download']}; "
@@ -251,27 +284,27 @@ def get_subscription(client_id: str):
         f"expire={meta['expire']}"
     )
 
-    # Собираем заголовки
     headers = {
-        # Префикс 'base64:' подсказывает приложению, как расшифровать заголовок
+        # 'base64:' - стандартный префикс для передачи эмодзи/кириллицы
         "Profile-Title": f"base64:{encoded_title}", 
         "Subscription-Userinfo": sub_userinfo,
         "Profile-Update-Interval": update_interval,
+        # Ссылка на поддержку (отобразится в меню информации о подписке)
+        "Profile-Web-Page": support_url
     }
     
-    # Запасной вариант для отображения имени (через стандарт передачи имен файлов)
+    # Добавляем стандартный заголовок Link для некоторых клиентов
+    headers["Link"] = f'<{support_url}>; rel="help"'
+
+    # Безопасное имя файла для системы
     safe_filename = urllib.parse.quote(title_raw)
     headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{safe_filename}"
-
-    if sub_conf.get("support_url"):
-        headers["Profile-Web-Page"] = sub_conf.get("support_url")
 
     return Response(
         content=content_b64, 
         headers=headers, 
         media_type="text/plain; charset=utf-8"
     )
-
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
