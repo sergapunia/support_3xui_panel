@@ -1,5 +1,6 @@
-import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
+
 import '../data/shared_prefs_service.dart';
 import '../domain/models/models.dart';
 import '../domain/services/panel_service.dart';
@@ -12,17 +13,9 @@ class AuthState {
   final String? baseUrl;
   final String? errorMessage;
 
-  AuthState({
-    required this.status,
-    this.baseUrl,
-    this.errorMessage,
-  });
+  AuthState({required this.status, this.baseUrl, this.errorMessage});
 
-  AuthState copyWith({
-    GameState? status,
-    String? baseUrl,
-    String? errorMessage,
-  }) {
+  AuthState copyWith({GameState? status, String? baseUrl, String? errorMessage}) {
     return AuthState(
       status: status ?? this.status,
       baseUrl: baseUrl ?? this.baseUrl,
@@ -42,7 +35,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> _init() async {
     // Wait longer for the Flutter engine to fully stabilize on Web
     await Future.delayed(const Duration(seconds: 2));
-    
+
     final conn = await _prefs.getConnection();
     if (conn['baseUrl'] != null && conn['admin'] != null && conn['password'] != null) {
       print('AuthNotifier: Found stored credentials, attempting auto-login...');
@@ -64,9 +57,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
     print('AuthNotifier: connecting to $url');
     state = state.copyWith(status: GameState.connecting, errorMessage: null);
     _panel.updateBaseUrl(url);
-    
+
     final success = await _panel.authenticate(admin, password, host, ipCascad, portCascad);
-    
+
     if (success) {
       print('AuthNotifier: auth success');
       await _prefs.saveConnection(url, admin, password, host, ipCascad, portCascad);
