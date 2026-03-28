@@ -1,0 +1,36 @@
+{
+  "bridge_public_url": "https://sergamainpanel.mooo.com:8000",
+  "subscription": {
+    "title": "\ud83c\uddf7\ud83c\uddfa Russia Premium VPN",
+    "description": "Fast & secure VLESS Reality | Support: @sergapunia",
+    "support_url": "https://t.me/sergapunia",
+    "update_interval_sec": 3600
+  },
+  "ip_cascad_server": "",
+  "port_cascad_server": 0,
+  "3xui_admin": "",
+  "3xui_password": "",
+  "host_current_server": "",
+  "start_range_ports": 4443,
+  "end_range_ports": 4443,
+  "default_target": "smartcaptcha.yandexcloud.net:443",
+  "default_sni": "smartcaptcha.yandexcloud.net",
+  "base_inbound": {
+    "remark_prefix": "Reality_Relay",
+    "protocol": "vless",
+    "decryption": "none",
+    "encryption": "none",
+    "flow": "xtls-rprx-vision",
+    "fp": "chrome",
+    "spiderX": "/",
+    "xver": 0,
+    "maxTimediff": 0,
+    "proxyProtocol": 0,
+    "sniffing": {
+      "enabled": false,
+      "destOverride": ["http", "tls", "quic", "fakedns"],
+      "metadataOnly": false,
+      "routeOnly": false
+    }
+  }
+}
