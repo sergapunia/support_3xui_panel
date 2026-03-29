@@ -15,7 +15,13 @@ class PanelService {
     _dio.options.baseUrl = _baseUrl!;
   }
 
-  Future<(bool, String?)> authenticate(String admin, String password, String host, String ipCascad, int portCascad) async {
+  Future<(bool, String?)> authenticate(
+    String admin,
+    String password,
+    String host,
+    String ipCascad,
+    int portCascad,
+  ) async {
     final payload = {
       'admin': admin,
       'password': password,
@@ -64,8 +70,15 @@ class PanelService {
     }
   }
 
-  Future<bool> addInbound(String remarkSuffix, int port, String target, String sni) async {
-    final payload = {'remark_suffix': remarkSuffix, 'port': port, 'target': target, 'sni': sni};
+  Future<bool> addInbound(String remarkSuffix, int port, String target, String sni, {String? ipCascad, int? portCascad}) async {
+    final payload = {
+      'remark_suffix': remarkSuffix,
+      'port': port,
+      'target': target,
+      'sni': sni,
+      if (ipCascad != null) 'ip_cascad': ipCascad,
+      if (portCascad != null) 'port_cascad': portCascad,
+    };
     print('PanelService: POST /inbounds | Payload: $payload');
     try {
       final response = await _dio.post('/inbounds', data: payload);

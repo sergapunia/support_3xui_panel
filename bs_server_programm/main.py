@@ -67,6 +67,8 @@ class InboundCreate(BaseModel):
     port: int
     target: Optional[str] = None
     sni: Optional[str] = None
+    ip_cascad: Optional[str] = None
+    port_cascad: Optional[int] = None
 
 class InboundUpdate(BaseModel):
     remark_suffix: Optional[str] = None
@@ -128,6 +130,30 @@ def list_inbounds():
 def create_inbound(data: InboundCreate):
     xui = get_xui()
     res = xui.add_inbound(data.remark_suffix, data.port, data.target, data.sni)
+    
+    if res.get("success") and res.get("obj"):
+        inbound_id = res["obj"]["id"]
+        if data.ip_cascad or data.port_cascad:
+            # Сохраняем кастомные настройки для инбаунда
+            config_dir = os.path.dirname(CONFIG_PATH)
+            inbounds_config_path = os.path.join(config_dir, 'inbounds_config.json')
+            
+            ib_configs = {}
+            if os.path.exists(inbounds_config_path):
+                try:
+                    with open(inbounds_config_path, 'r') as f:
+                        ib_configs = json.load(f)
+                except:
+                    pass
+            
+            ib_configs[str(inbound_id)] = {
+                "ip_cascad": data.ip_cascad,
+                "port_cascad": data.port_cascad
+            }
+            
+            with open(inbounds_config_path, 'w') as f:
+                json.dump(ib_configs, f, indent=2)
+                
     return res
 
 @app.put("/inbounds/{inbound_id}")

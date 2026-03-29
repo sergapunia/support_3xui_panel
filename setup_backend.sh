@@ -2,13 +2,21 @@
 set -e
 
 DOMAIN=$1
-PORT=$2 # Порт, на котором будет висеть Nginx
+PORT=$2
+
+if [ -z "$DOMAIN" ] || [ -z "$PORT" ]; then
+    echo "❌ Ошибка: Укажите домен и порт!"
+    exit 1
+fi
 
 # Конфигурация
 REPO_URL="https://github.com/sergapunia/support_3xui_panel.git"
 TARGET_DIR="/root/support_backend"
 BACKEND_DIR="$TARGET_DIR/bs_server_programm"
 VENV_PATH="$BACKEND_DIR/venv"
+
+echo "📦 Установка зависимостей Python..."
+sudo apt-get update && sudo apt-get install -y python3 python3-pip python3-venv git
 
 echo "📥 Клонирование репозитория..."
 sudo rm -rf "$TARGET_DIR"
@@ -19,16 +27,14 @@ if [ ! -d "$BACKEND_DIR" ]; then
     exit 1
 fi
 
-echo "🐍 Настройка Python окружения..."
-sudo apt-get update && sudo apt-get install -y python3 python3-pip python3-venv
-
+echo "🐍 Настройка виртуального окружения..."
 python3 -m venv "$VENV_PATH"
 source "$VENV_PATH/bin/activate"
 pip install --upgrade pip
 pip install fastapi uvicorn requests pydantic cryptography python-multipart
 
 echo "⚙️ Создание службы bs_backend.service..."
-sudo cat > /etc/systemd/system/bs_backend.service <<EOF
+sudo bash -c "cat > /etc/systemd/system/bs_backend.service <<EOF
 [Unit]
 Description=FastAPI 3x-ui Bridge
 After=network.target
@@ -36,14 +42,13 @@ After=network.target
 [Service]
 User=root
 WorkingDirectory=$BACKEND_DIR
-# Передаем внешний порт Nginx бэкенду
-Environment="EXTERNAL_PORT=$PORT"
+Environment=\"EXTERNAL_PORT=$PORT\"
 ExecStart=$VENV_PATH/bin/python3 main.py
 Restart=always
 
 [Install]
 WantedBy=multi-user.target
-EOF
+EOF"
 
 sudo systemctl daemon-reload
 sudo systemctl enable bs_backend

@@ -139,6 +139,17 @@ class XUIClient:
         inbounds_res = self.get_inbounds()
         if not inbounds_res.get("success"): return None
 
+        # Загружаем кастомные настройки инбаундов
+        base_path = os.path.dirname(os.path.abspath(__file__))
+        inbounds_config_path = os.path.join(base_path, 'inbounds_config.json')
+        ib_configs = {}
+        if os.path.exists(inbounds_config_path):
+            try:
+                with open(inbounds_config_path, 'r') as f:
+                    ib_configs = json.load(f)
+            except:
+                pass
+
         all_links = []
         meta = {"upload": 0, "download": 0, "total": 0, "expire": 0}
         found = False
@@ -147,6 +158,16 @@ class XUIClient:
             settings = json.loads(ib['settings'])
             stream = json.loads(ib['streamSettings'])
             clients = settings.get('clients', [])
+
+            # Ищем кастомные настройки для этого инбаунда
+            ib_id_str = str(ib['id'])
+            ib_conf = ib_configs.get(ib_id_str, {})
+            custom_ip = ib_conf.get("ip_cascad")
+            custom_port = ib_conf.get("port_cascad")
+
+            # Приоритет: кастомный конфиг -> глобальный конфиг
+            cascad_ip = custom_ip if custom_ip else self.config['ip_cascad_server']
+            cascad_port = custom_port if custom_port is not None else self.config['port_cascad_server']
 
             for c in clients:
                 if c.get('id') == client_id or c.get('email', '').lower() == client_id.lower():
@@ -174,7 +195,8 @@ class XUIClient:
                     }
                     query = urllib.parse.urlencode(params)
                     name = c.get('tgId') or c.get('email') or "VPN"
-                    link = f"vless://{c['id']}@{self.config['ip_cascad_server']}:{self.config['port_cascad_server']}?{query}#{urllib.parse.quote(name)}"
+                    
+                    link = f"vless://{c['id']}@{cascad_ip}:{cascad_port}?{query}#{urllib.parse.quote(name)}"
                     all_links.append(link)
 
         return {"links": all_links, "meta": meta} if found else None

@@ -49,59 +49,94 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final portController = TextEditingController(text: selectedPort?.toString() ?? '');
     final targetController = TextEditingController(text: config.defaultTarget);
     final sniController = TextEditingController(text: config.defaultSni);
+    final ipCascadController = TextEditingController();
+    final portCascadController = TextEditingController();
+
+    bool isAnyvaiCascad = false;
 
     if (!mounted) return;
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add Inbound'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (warning != null)
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.red.withOpacity(0.3))),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(warning, style: const TextStyle(color: Colors.redAccent, fontSize: 12))),
-                    ],
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Add Inbound'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (warning != null)
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.red.withOpacity(0.3))),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(warning, style: const TextStyle(color: Colors.redAccent, fontSize: 12))),
+                      ],
+                    ),
                   ),
+                TextField(controller: suffixController, decoration: const InputDecoration(labelText: 'Remark Suffix')),
+                const SizedBox(height: 16),
+                TextField(controller: portController, decoration: const InputDecoration(labelText: 'Port'), keyboardType: TextInputType.number),
+                const SizedBox(height: 16),
+                TextField(controller: targetController, decoration: const InputDecoration(labelText: 'Target (e.g. google.com:443)')),
+                const SizedBox(height: 16),
+                TextField(controller: sniController, decoration: const InputDecoration(labelText: 'SNI')),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    const Text('Type: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      label: const Text('Standard'),
+                      selected: !isAnyvaiCascad,
+                      onSelected: (val) => setDialogState(() => isAnyvaiCascad = !val),
+                    ),
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      label: const Text('Anyvai Cascad'),
+                      selected: isAnyvaiCascad,
+                      onSelected: (val) => setDialogState(() => isAnyvaiCascad = val),
+                    ),
+                  ],
                 ),
-              TextField(controller: suffixController, decoration: const InputDecoration(labelText: 'Remark Suffix')),
-              const SizedBox(height: 16),
-              TextField(controller: portController, decoration: const InputDecoration(labelText: 'Port'), keyboardType: TextInputType.number),
-              const SizedBox(height: 16),
-              TextField(controller: targetController, decoration: const InputDecoration(labelText: 'Target (e.g. google.com:443)')),
-              const SizedBox(height: 16),
-              TextField(controller: sniController, decoration: const InputDecoration(labelText: 'SNI')),
-            ],
+                if (isAnyvaiCascad) ...[
+                  const SizedBox(height: 16),
+                  TextField(controller: ipCascadController, decoration: const InputDecoration(labelText: 'Cascade IP (Override)')),
+                  const SizedBox(height: 16),
+                  TextField(controller: portCascadController, decoration: const InputDecoration(labelText: 'Cascade Port (Override)'), keyboardType: TextInputType.number),
+                ],
+              ],
+            ),
           ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: warning != null
+                  ? null
+                  : () {
+                      final port = int.tryParse(portController.text);
+                      if (port == null) return;
+
+                      final cascadPort = int.tryParse(portCascadController.text);
+
+                      ref.read(panelProvider.notifier).addInbound(
+                            suffixController.text,
+                            port,
+                            targetController.text,
+                            sniController.text,
+                            ipCascad: isAnyvaiCascad ? ipCascadController.text : null,
+                            portCascad: isAnyvaiCascad ? cascadPort : null,
+                          );
+                      Navigator.pop(context);
+                    },
+              child: const Text('Add'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: warning != null
-                ? null
-                : () {
-                    final port = int.tryParse(portController.text);
-                    if (port == null) return;
-                    ref.read(panelProvider.notifier).addInbound(
-                          suffixController.text,
-                          port,
-                          targetController.text,
-                          sniController.text,
-                        );
-                    Navigator.pop(context);
-                  },
-            child: const Text('Add'),
-          ),
-        ],
       ),
     );
   }

@@ -48,9 +48,9 @@ class PanelNotifier extends StateNotifier<PanelState> {
     }
   }
 
-  Future<void> addInbound(String suffix, int port, String target, String sni) async {
+  Future<void> addInbound(String suffix, int port, String target, String sni, {String? ipCascad, int? portCascad}) async {
     state = state.copyWith(isActionLoading: true);
-    final success = await _panel.addInbound(suffix, port, target, sni);
+    final success = await _panel.addInbound(suffix, port, target, sni, ipCascad: ipCascad, portCascad: portCascad);
     if (success) {
       await fetchInbounds();
     }
